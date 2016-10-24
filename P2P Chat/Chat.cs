@@ -40,7 +40,7 @@ namespace P2P_Chat
                 mutex.WaitOne();
                 isTyping = true;
                 mutex.ReleaseMutex();
-                Thread.Sleep(500);
+                Thread.Sleep(200);
             }
         }
 

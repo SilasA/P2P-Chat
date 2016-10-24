@@ -80,8 +80,9 @@ namespace P2P_Chat
 
             byte[] buffer = new byte[1500];
             socket.BeginReceiveFrom(buffer, 0, buffer.Length,
-                SocketFlags.None, ref epPeer,
-                new AsyncCallback(MessageCallBack), buffer);
+                SocketFlags.None, ref epHost,
+                new AsyncCallback(MessageCallback), buffer);
+            socket.Send(Encoding.ASCII.GetBytes("$name=" + name));
         }
 
         public override void Run()
@@ -108,7 +109,7 @@ namespace P2P_Chat
                             showIPs = !showIPs;
                     }
 
-                    SendMsg(Format(username, line));
+                    SendMsg(Format(name, line));
                     mutex.WaitOne();
                     isTyping = false;
                     mutex.ReleaseMutex();
@@ -118,6 +119,10 @@ namespace P2P_Chat
             }
 
             poll.Abort();
+        }
+        private void MessageCallback(IAsyncResult ar)
+        {
+
         }
     }
 }
