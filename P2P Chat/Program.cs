@@ -18,11 +18,13 @@ namespace P2P_Chat
 
         static void Main(string[] args)
         {
-            if (args.Length > 1)
+            if (Console.ReadKey().Key == ConsoleKey.H)
+                args = new string[1] { "-h" };
+            if (args.Length > 0)
             {
-                if (args[1] == "-h")
+                if (args[0] == "-h")
                     chat = new Host();
-                else if (args[1] == "-c")
+                else if (args[0] == "-c")
                     chat = new Client();
                 else return;
             }

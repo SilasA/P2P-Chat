@@ -105,8 +105,8 @@ namespace P2P_Chat
                             break;
                         else if (line.ToUpper() == "CLEAR")
                             chat.Clear();
-                        else if (line.ToUpper() == "CON")
-                            showIPs = !showIPs;
+                        /*else if (line.ToUpper() == "CON")
+                            showIPs = !showIPs;*/
                     }
 
                     SendMsg(Format(name, line));
@@ -122,7 +122,13 @@ namespace P2P_Chat
         }
         private void MessageCallback(IAsyncResult ar)
         {
+            
+        }
 
+        protected override void Draw()
+        {
+            Console.Clear();
+            base.Draw();
         }
     }
 }

@@ -40,6 +40,9 @@ namespace P2P_Chat
 
         private int Top => sCLients.Count - 1;
 
+        private Thread listenThread;
+        private Mutex chatLock;
+
         public ManualResetEvent allDone = new ManualResetEvent(false);
 
         /// <summary>
@@ -50,7 +53,13 @@ namespace P2P_Chat
             name = GetRoomName();
 
             ipLocal = GetLocalIp();
+            epLocal = new IPEndPoint(ipLocal, port);
             sCLients = new List<State>();
+            chatLock = new Mutex();
+        }
+        ~Host()
+        {
+            listenThread.Abort();
         }
 
         /// <summary>
@@ -175,7 +184,41 @@ namespace P2P_Chat
         /// </summary>
         public override void Run()
         {
-            Listen();
+            listenThread = new Thread(Listen);
+            listenThread.Start();
+
+            poll.Start();
+
+            while (true)
+            {
+                string line;
+                if (chat.Count > 15) chat.RemoveAt(0);
+                if (isTyping)
+                {
+                    line = Console.ReadLine();
+
+                    // Commands
+                    if (line.Length > 0 && line.ToCharArray()[0] == '/')
+                    {
+                        line = line.Remove(0, 1);
+                        if (line.ToUpper() == "EXIT")
+                            break;
+                        else if (line.ToUpper() == "CLEAR")
+                            chat.Clear();
+                        /*else if (line.ToUpper() == "CON")
+                            showIPs = !showIPs;*/
+                    }
+
+                    SendMsg(Format(name, line));
+                    mutex.WaitOne();
+                    isTyping = false;
+                    mutex.ReleaseMutex();
+                }
+                Draw();
+                Thread.Sleep(500);
+            }
+
+            poll.Abort();
         }
 
         /// <summary>
@@ -183,6 +226,7 @@ namespace P2P_Chat
         /// </summary>
         protected override void Draw()
         {
+            Console.Clear();
             Console.WriteLine("Server IP: " + ipLocal.ToString());
             base.Draw();
         }

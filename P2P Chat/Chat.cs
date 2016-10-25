@@ -67,6 +67,8 @@ namespace P2P_Chat
         public Chat()
         {
             chat = new List<string>();
+            poll = new Thread(IsTypeMsg);
+            mutex = new Mutex();
         }
 
         /// <summary>
@@ -79,7 +81,6 @@ namespace P2P_Chat
 
         protected virtual void Draw()
         {
-            Console.Clear();
             Console.WriteLine(new string('=', 30));
             foreach (string s in chat)
                 Console.WriteLine(s);
