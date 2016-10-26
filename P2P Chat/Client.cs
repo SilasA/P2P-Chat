@@ -16,6 +16,9 @@ namespace P2P_Chat
         IPAddress ipHost;
         Socket socket;
 
+        Thread receiveThread;
+        Mutex receiveLock;
+
         /// <summary>
         /// Prompts the user for the peer IP address.
         /// </summary>
@@ -34,18 +37,6 @@ namespace P2P_Chat
         {
             Console.Write("Username: ");
             return Console.ReadLine();
-        }
-
-        /// <summary>
-        /// Sends a message to the host.
-        /// </summary>
-        /// <param name="message">Formatted string to send</param>
-        protected override void SendMsg(string message)
-        {
-            ASCIIEncoding ascii = new ASCIIEncoding();
-            byte[] msg = new byte[MAX_CHAR];
-            msg = ascii.GetBytes(message);
-            socket.Send(msg);
         }
 
         /// <summary>
@@ -71,17 +62,14 @@ namespace P2P_Chat
 
             ipHost = GetHostIp();
             epHost = new IPEndPoint(ipHost, port);
-            socket.Connect(epHost);
-
             Console.Clear();
 
             mutex = new Mutex();
             poll = new Thread(IsTypeMsg);
 
-            byte[] buffer = new byte[1500];
-            socket.BeginReceiveFrom(buffer, 0, buffer.Length,
-                SocketFlags.None, ref epHost,
-                new AsyncCallback(MessageCallback), buffer);
+            // Connect to the remote endpoint.
+            socket.BeginConnect(epHost,
+                new AsyncCallback(ConnectCallback), socket);
             socket.Send(Encoding.ASCII.GetBytes("$name=" + name));
         }
 
@@ -105,8 +93,6 @@ namespace P2P_Chat
                             break;
                         else if (line.ToUpper() == "CLEAR")
                             chat.Clear();
-                        /*else if (line.ToUpper() == "CON")
-                            showIPs = !showIPs;*/
                     }
 
                     SendMsg(Format(name, line));
@@ -120,15 +106,74 @@ namespace P2P_Chat
 
             poll.Abort();
         }
-        private void MessageCallback(IAsyncResult ar)
+
+        private void ConnectCallback(IAsyncResult ar)
         {
-            
+            // Retrieve the socket from the state object.
+            Socket client = (Socket)ar.AsyncState;
+
+            // Complete the connection.
+            client.EndConnect(ar);
+        }
+
+        private void Receive()
+        {
+            byte[] buffer = new byte[MAX_CHAR];
+            socket.BeginReceive(buffer, 0, MAX_CHAR, 0,
+                new AsyncCallback(ReceiveCallback), buffer);
+        }
+
+        private void ReceiveCallback(IAsyncResult ar)
+        {
+            // Retrieve the state object and the client socket 
+            // from the asynchronous state object.
+            byte[] msg = (byte[])ar.AsyncState;
+
+            // Read data from the remote device.
+
+            if (socket.EndReceive(ar) > 0)
+            {
+                // Get the rest of the data.
+                socket.BeginReceive(msg, 0, MAX_CHAR, 0,
+                    new AsyncCallback(ReceiveCallback), msg);
+            }
+            else
+            {
+                // All the data has arrived; put it in response.
+                if (msg.Length > 1)
+                {
+                    string m = Encoding.ASCII.GetString(msg);
+                    chat.Add(m.Remove(m.IndexOf("<EOF>")));
+                }
+            }
+        }
+
+        private void SendCallback(IAsyncResult ar)
+        {
+            // Retrieve the socket from the state object.
+            Socket client = (Socket)ar.AsyncState;
+
+            client.EndSend(ar);
         }
 
         protected override void Draw()
         {
             Console.Clear();
             base.Draw();
+        }
+
+        /// <summary>
+        /// Sends a message to the host.
+        /// </summary>
+        /// <param name="message">Formatted string to send</param>
+        protected override void SendMsg(string message)
+        {
+            ASCIIEncoding ascii = new ASCIIEncoding();
+            byte[] msg = new byte[MAX_CHAR];
+            msg = ascii.GetBytes(message);
+            // Begin sending the data to the remote device.
+            socket.BeginSend(msg, 0, msg.Length, 0,
+                new AsyncCallback(SendCallback), socket);
         }
     }
 }

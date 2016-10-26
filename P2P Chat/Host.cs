@@ -41,7 +41,7 @@ namespace P2P_Chat
         private int Top => sCLients.Count - 1;
 
         private Thread listenThread;
-        private Mutex chatLock;
+        private Mutex clientLock;
 
         public ManualResetEvent allDone = new ManualResetEvent(false);
 
@@ -55,7 +55,7 @@ namespace P2P_Chat
             ipLocal = GetLocalIp();
             epLocal = new IPEndPoint(ipLocal, port);
             sCLients = new List<State>();
-            chatLock = new Mutex();
+            clientLock = new Mutex();
         }
         ~Host()
         {
@@ -110,11 +110,13 @@ namespace P2P_Chat
             Socket listener = (Socket)ar.AsyncState;
             Socket handler = listener.EndAccept(ar);
 
+            clientLock.WaitOne();
             // Create the state object.
             sCLients.Add(new State(handler));
 
             handler.BeginReceive(sCLients[Top].buffer, 0, MAX_CHAR, 0,
                 new AsyncCallback(ReadCallback), sCLients[Top]);
+            clientLock.ReleaseMutex();
 
             SendMsg("$name=" + name + "<EOF>");
         }
@@ -143,10 +145,11 @@ namespace P2P_Chat
                 // more data.
                 if (message.IndexOf("<EOF>") > -1)
                 {
-                    // Find invisible data
+                    message = message.Remove(message.IndexOf("<EOF>"));
+                    // Find metadata
                     if (message.StartsWith("$"))
                     {
-                        message.Substring(0, 1);
+                        message = message.Substring(0, 1);
                         string[] substr = message.Split('=');
                         switch (substr[0])
                         {
@@ -170,7 +173,7 @@ namespace P2P_Chat
         }
 
         /// <summary>
-        /// Prompts the user for a username.
+        /// Prompts the host for a chat room name.
         /// </summary>
         /// <returns></returns>
         private string GetRoomName()
@@ -205,8 +208,6 @@ namespace P2P_Chat
                             break;
                         else if (line.ToUpper() == "CLEAR")
                             chat.Clear();
-                        /*else if (line.ToUpper() == "CON")
-                            showIPs = !showIPs;*/
                     }
 
                     SendMsg(Format(name, line));
@@ -240,12 +241,14 @@ namespace P2P_Chat
             byte[] msg = Encoding.ASCII.GetBytes(message);
             chat.Add(message);
 
+            clientLock.WaitOne();
             foreach (State s in sCLients)
             {
                 // Begin sending the data to the remote device.
                 s.workSocket.BeginSend(msg, 0, msg.Length, 0,
                     new AsyncCallback(SendCallback), s);
             }
+            clientLock.ReleaseMutex();
         }
 
         /// <summary>
