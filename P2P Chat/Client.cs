@@ -16,8 +16,7 @@ namespace P2P_Chat
         IPAddress ipHost;
         Socket socket;
 
-        Thread receiveThread;
-        Mutex receiveLock;
+        public ManualResetEvent connected = new ManualResetEvent(false);
 
         /// <summary>
         /// Prompts the user for the peer IP address.
@@ -70,6 +69,7 @@ namespace P2P_Chat
             // Connect to the remote endpoint.
             socket.BeginConnect(epHost,
                 new AsyncCallback(ConnectCallback), socket);
+            connected.WaitOne();
             socket.Send(Encoding.ASCII.GetBytes("$name=" + name));
         }
 
@@ -100,6 +100,7 @@ namespace P2P_Chat
                     isTyping = false;
                     mutex.ReleaseMutex();
                 }
+                Receive();
                 Draw();
                 Thread.Sleep(500);
             }
@@ -114,6 +115,7 @@ namespace P2P_Chat
 
             // Complete the connection.
             client.EndConnect(ar);
+            connected.Set();
         }
 
         private void Receive()
@@ -166,8 +168,9 @@ namespace P2P_Chat
         /// Sends a message to the host.
         /// </summary>
         /// <param name="message">Formatted string to send</param>
-        protected override void SendMsg(string message)
+        protected override void SendMsg(string message, bool inChat = false)
         {
+            // User has joined
             ASCIIEncoding ascii = new ASCIIEncoding();
             byte[] msg = new byte[MAX_CHAR];
             msg = ascii.GetBytes(message);

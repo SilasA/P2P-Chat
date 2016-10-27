@@ -81,10 +81,12 @@ namespace P2P_Chat
                 {
                     allDone.Reset();
 
+                    State state = new State(listener);
+
                     // Start an asynchronous socket to listen for connections.
                     listener.BeginAccept(
                         new AsyncCallback(AcceptCallback),
-                        listener);
+                        state);
 
                     // Wait until a connection is made before continuing.
                     allDone.WaitOne();
@@ -107,7 +109,7 @@ namespace P2P_Chat
             allDone.Set();
 
             // Get the socket that handles the client request.
-            Socket listener = (Socket)ar.AsyncState;
+            Socket listener = ((State)ar.AsyncState).workSocket;
             Socket handler = listener.EndAccept(ar);
 
             clientLock.WaitOne();
@@ -118,7 +120,7 @@ namespace P2P_Chat
                 new AsyncCallback(ReadCallback), sCLients[Top]);
             clientLock.ReleaseMutex();
 
-            SendMsg("$name=" + name + "<EOF>");
+            SendMsg("$name=" + name + "<EOF>", false);
         }
 
         /// <summary>
@@ -236,10 +238,10 @@ namespace P2P_Chat
         /// 
         /// </summary>
         /// <param name="message"></param>
-        protected override void SendMsg(string message)
+        protected override void SendMsg(string message, bool inChat = true)
         {
             byte[] msg = Encoding.ASCII.GetBytes(message);
-            chat.Add(message);
+            if (!inChat) chat.Add(message);
 
             clientLock.WaitOne();
             foreach (State s in sCLients)

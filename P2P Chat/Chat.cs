@@ -90,7 +90,7 @@ namespace P2P_Chat
         /// 
         /// </summary>
         /// <param name="message"></param>
-        protected virtual void SendMsg(string message)
+        protected virtual void SendMsg(string message, bool inChat = true)
         {
 
         }
@@ -103,7 +103,7 @@ namespace P2P_Chat
         /// <param name="message">Message content</param>
         public static string Format(string user, string message)
         {
-            return user + ": " + message;
+            return user + ": " + message + "<EOF>";
         }
     }
 }
