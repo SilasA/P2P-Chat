@@ -120,7 +120,7 @@ namespace P2P_Chat
                 new AsyncCallback(ReadCallback), sCLients[Top]);
             clientLock.ReleaseMutex();
 
-            SendMsg("$name=" + name + "<EOF>", false);
+            SendMD("$name=" + name + "<EOF>");
         }
 
         /// <summary>
@@ -172,6 +172,12 @@ namespace P2P_Chat
                         new AsyncCallback(ReadCallback), state);
                 }
             }
+            else
+            {
+                // Not all data received. Get more.
+                handler.BeginReceive(state.buffer, 0, MAX_CHAR, 0,
+                    new AsyncCallback(ReadCallback), state);
+            }
         }
 
         /// <summary>
@@ -211,11 +217,13 @@ namespace P2P_Chat
                         else if (line.ToUpper() == "CLEAR")
                             chat.Clear();
                     }
-
-                    SendMsg(Format(name, line));
-                    mutex.WaitOne();
-                    isTyping = false;
-                    mutex.ReleaseMutex();
+                    else
+                    {
+                        SendMsg(Format(name, line));
+                        mutex.WaitOne();
+                        isTyping = false;
+                        mutex.ReleaseMutex();
+                    }
                 }
                 Draw();
                 Thread.Sleep(500);
@@ -231,6 +239,7 @@ namespace P2P_Chat
         {
             Console.Clear();
             Console.WriteLine("Server IP: " + ipLocal.ToString());
+            Console.WriteLine("Room Name: " + name);
             base.Draw();
         }
 
@@ -238,15 +247,30 @@ namespace P2P_Chat
         /// 
         /// </summary>
         /// <param name="message"></param>
-        protected override void SendMsg(string message, bool inChat = true)
+        protected override void SendMsg(string message)
         {
             byte[] msg = Encoding.ASCII.GetBytes(message);
-            if (!inChat) chat.Add(message);
+            message = message.Remove(message.IndexOf("<EOF>"));
+            chat.Add(message);
 
             clientLock.WaitOne();
             foreach (State s in sCLients)
             {
                 // Begin sending the data to the remote device.
+                s.workSocket.BeginSend(msg, 0, msg.Length, 0,
+                    new AsyncCallback(SendCallback), s);
+            }
+            clientLock.ReleaseMutex();
+        }
+
+        protected override void SendMD(string message)
+        {
+            byte[] msg = Encoding.ASCII.GetBytes(message);
+
+            clientLock.WaitOne();
+            foreach (State s in sCLients)
+            {
+                // Begin sending the metadata to the remote device.
                 s.workSocket.BeginSend(msg, 0, msg.Length, 0,
                     new AsyncCallback(SendCallback), s);
             }
@@ -262,7 +286,7 @@ namespace P2P_Chat
             try
             {
                 // Retrieve the socket from the state object.
-                Socket handler = (Socket)ar.AsyncState;
+                Socket handler = ((State)ar.AsyncState).workSocket;
 
                 // Complete sending the data to the remote device.
                 int bytesSent = handler.EndSend(ar);

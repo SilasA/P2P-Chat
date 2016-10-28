@@ -10,11 +10,15 @@ using System.Threading;
 
 namespace P2P_Chat
 {
+    // Crashes after host connection lost
+
     class Client : Chat
     {
         EndPoint epHost;
         IPAddress ipHost;
         Socket socket;
+
+        string hostName;
 
         public ManualResetEvent connected = new ManualResetEvent(false);
 
@@ -132,8 +136,9 @@ namespace P2P_Chat
             byte[] msg = (byte[])ar.AsyncState;
 
             // Read data from the remote device.
+            string message = Encoding.ASCII.GetString(msg);
 
-            if (socket.EndReceive(ar) > 0)
+            if (message.IndexOf("<EOF>") < -1)
             {
                 // Get the rest of the data.
                 socket.BeginReceive(msg, 0, MAX_CHAR, 0,
@@ -142,10 +147,27 @@ namespace P2P_Chat
             else
             {
                 // All the data has arrived; put it in response.
-                if (msg.Length > 1)
+                if (msg.Length > 0)
                 {
-                    string m = Encoding.ASCII.GetString(msg);
-                    chat.Add(m.Remove(m.IndexOf("<EOF>")));
+                    message = message.Remove(message.IndexOf("<EOF>"));
+                    // Find metadata
+                    if (message.StartsWith("$"))
+                    {
+                        message = message.Remove(message.IndexOf('$'), 1);
+                        string[] substr = message.Split('=');
+                        switch (substr[0])
+                        {
+                            case "name":
+                                hostName = substr[1];
+                                break;
+                            default:
+                                break;
+                        }
+                    }
+                    else
+                    {
+                        chat.Add(message);
+                    }
                 }
             }
         }
@@ -161,6 +183,7 @@ namespace P2P_Chat
         protected override void Draw()
         {
             Console.Clear();
+            Console.WriteLine("Room Name: " + hostName);
             base.Draw();
         }
 
@@ -168,15 +191,23 @@ namespace P2P_Chat
         /// Sends a message to the host.
         /// </summary>
         /// <param name="message">Formatted string to send</param>
-        protected override void SendMsg(string message, bool inChat = false)
+        protected override void SendMsg(string message)
         {
             // User has joined
-            ASCIIEncoding ascii = new ASCIIEncoding();
             byte[] msg = new byte[MAX_CHAR];
-            msg = ascii.GetBytes(message);
+            msg = Encoding.ASCII.GetBytes(message);
             // Begin sending the data to the remote device.
             socket.BeginSend(msg, 0, msg.Length, 0,
                 new AsyncCallback(SendCallback), socket);
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="message"></param>
+        protected override void SendMD(string message)
+        {
+            SendMsg(message);
         }
     }
 }

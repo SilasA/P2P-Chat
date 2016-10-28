@@ -90,7 +90,16 @@ namespace P2P_Chat
         /// 
         /// </summary>
         /// <param name="message"></param>
-        protected virtual void SendMsg(string message, bool inChat = true)
+        protected virtual void SendMsg(string message)
+        {
+
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="message"></param>
+        protected virtual void SendMD(string message)
         {
 
         }
