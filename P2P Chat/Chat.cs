@@ -15,6 +15,7 @@ namespace P2P_Chat
         // CONST
         public const int port = 666;
         public const int MAX_CHAR = 300;
+        public const int MAX_LINES = 20;
 
         protected List<string> chat;
         protected EndPoint epLocal;
@@ -57,7 +58,7 @@ namespace P2P_Chat
             foreach (IPAddress ip in host.AddressList)
             {
                 if (ip.AddressFamily == AddressFamily.InterNetwork)
-                    if (ip.ToString().StartsWith("10")) return ip;
+                    /*if (ip.ToString().StartsWith("10"))*/ return ip;
             }
             return new IPAddress(new byte[4]);
         }
@@ -116,7 +117,10 @@ namespace P2P_Chat
         /// <param name="message">Message content</param>
         public static string Format(string user, string message)
         {
-            return user + ": " + message + "<EOF>";
+            string s = user + ": " + message;
+            if (s.IndexOf("$") > -1 || s.IndexOf("<EOF>") > -1)
+                return null;
+            return s + "<EOF>";
         }
     }
 }

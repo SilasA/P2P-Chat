@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Net;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading;
 
 namespace P2P_Chat
@@ -36,7 +35,8 @@ namespace P2P_Chat
     class Host : Chat
     {
         List<State> sCLients;
-        //List<IPAddress> ipCLients;
+
+        Logger logger;
 
         private int Top => sCLients.Count - 1;
 
@@ -56,6 +56,8 @@ namespace P2P_Chat
             epLocal = new IPEndPoint(ipLocal, port);
             sCLients = new List<State>();
             clientLock = new Mutex();
+
+            logger = new Logger();
         }
         ~Host()
         {
@@ -112,6 +114,7 @@ namespace P2P_Chat
             Socket listener = ((State)ar.AsyncState).workSocket;
             Socket handler = listener.EndAccept(ar);
 
+
             clientLock.WaitOne();
             // Create the state object.
             sCLients.Add(new State(handler));
@@ -150,12 +153,20 @@ namespace P2P_Chat
                     // Find metadata
                     if (message.StartsWith("$"))
                     {
-                        message = message.Substring(0, 1);
+                        message = message.Substring(0, 1).Remove(message.IndexOf("<EOF>"));
                         string[] substr = message.Split('=');
                         switch (substr[0])
                         {
                             case "name":
-                                state.username = substr[1].Remove(message.IndexOf("<EOF>"));
+                                state.username = substr[1];
+                                logger.WriteIP(state.username, ((IPEndPoint)state.workSocket.RemoteEndPoint).Address.ToString());
+                                SendMsg(Format("[Server]", state.username + " has joined the chat!"));
+                                break;
+                            case "discon":
+                                SendMsg(Format("[Server]", state.username + " has disconnected!"));
+                                clientLock.WaitOne();
+                                sCLients.Remove(state);
+                                clientLock.ReleaseMutex();
                                 break;
                             default:
                                 break;
@@ -199,7 +210,7 @@ namespace P2P_Chat
             while (true)
             {
                 string line;
-                if (chat.Count > 15) chat.RemoveAt(0);
+                if (chat.Count > MAX_LINES) chat.RemoveAt(0);
                 mutex.WaitOne();
                 if (isTyping)
                 {
@@ -209,13 +220,26 @@ namespace P2P_Chat
                     if (line.Length > 0 && line.ToCharArray()[0] == '/')
                     {
                         line = line.Remove(0, 1);
-                        if (line.ToUpper() == "EXIT")
+                        if (line.ToUpper().Contains("EXIT"))
                             break;
-                        else if (line.ToUpper() == "CLEAR")
+                        else if (line.ToUpper().Contains("CLEAR"))
                         {
                             chatLock.WaitOne();
                             chat.Clear();
                             chatLock.ReleaseMutex();
+                        }
+                        else if (line.ToUpper().Contains("DISCON"))
+                        {
+                            string[] arg = line.Split('=');
+                            if (arg.Length > 1)
+                            {
+                                clientLock.WaitOne();
+                                foreach (State s in sCLients)
+                                {
+                                    if (arg[1] == s.username) Disconnect(s);
+                                }
+                                clientLock.ReleaseMutex();
+                            }
                         }
                     }
                     else
@@ -265,6 +289,8 @@ namespace P2P_Chat
                     new AsyncCallback(SendCallback), s);
             }
             clientLock.ReleaseMutex();
+
+            logger.WriteLine(message);
         }
 
         protected override void SendMD(string message)
@@ -299,6 +325,11 @@ namespace P2P_Chat
             {
                 Console.WriteLine(e.ToString());
             }
+        }
+
+        private void Disconnect(State user)
+        {
+            user.workSocket.Send(Encoding.ASCII.GetBytes("$discon<EOF>"));
         }
     }
 }

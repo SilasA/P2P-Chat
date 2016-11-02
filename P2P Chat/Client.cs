@@ -84,7 +84,7 @@ namespace P2P_Chat
             while (true)
             {
                 string line;
-                if (chat.Count > 15) chat.RemoveAt(0);
+                if (chat.Count > MAX_LINES) chat.RemoveAt(0);
                 if (isTyping)
                 {
                     line = Console.ReadLine();
@@ -124,53 +124,67 @@ namespace P2P_Chat
 
         private void Receive()
         {
-            byte[] buffer = new byte[MAX_CHAR];
-            socket.BeginReceive(buffer, 0, MAX_CHAR, 0,
-                new AsyncCallback(ReceiveCallback), buffer);
+            if (socket.Connected)
+            {
+                byte[] buffer = new byte[MAX_CHAR];
+                socket.BeginReceive(buffer, 0, MAX_CHAR, 0,
+                    new AsyncCallback(ReceiveCallback), buffer);
+            }
+            else Disconnected();
         }
 
         private void ReceiveCallback(IAsyncResult ar)
         {
-            // Retrieve the state object and the client socket 
-            // from the asynchronous state object.
-            byte[] msg = (byte[])ar.AsyncState;
-
-            // Read data from the remote device.
-            string message = Encoding.ASCII.GetString(msg);
-
-            if (message.IndexOf("<EOF>") < -1)
+            try
             {
-                // Get the rest of the data.
-                socket.BeginReceive(msg, 0, MAX_CHAR, 0,
-                    new AsyncCallback(ReceiveCallback), msg);
-            }
-            else
-            {
-                // All the data has arrived; put it in response.
-                if (msg.Length > 0)
+                // Retrieve the state object and the client socket 
+                // from the asynchronous state object.
+                byte[] msg = (byte[])ar.AsyncState;
+
+                // Read data from the remote device.
+                string message = Encoding.ASCII.GetString(msg);
+
+                if (message.IndexOf("<EOF>") < -1)
                 {
-                    message = message.Remove(message.IndexOf("<EOF>"));
-                    // Find metadata
-                    if (message.StartsWith("$"))
+                    // Get the rest of the data.
+                    socket.BeginReceive(msg, 0, MAX_CHAR, 0,
+                        new AsyncCallback(ReceiveCallback), msg);
+                }
+                else
+                {
+                    // All the data has arrived; put it in response.
+                    if (msg.Length > 0)
                     {
-                        message = message.Remove(message.IndexOf('$'), 1);
-                        string[] substr = message.Split('=');
-                        switch (substr[0])
+                        message = message.Remove(message.IndexOf("<EOF>"));
+                        // Find metadata
+                        if (message.StartsWith("$"))
                         {
-                            case "name":
-                                hostName = substr[1];
-                                break;
-                            default:
-                                break;
+                            message = message.Remove(message.IndexOf('$'), 1);
+                            string[] substr = message.Split('=');
+                            switch (substr[0])
+                            {
+                                case "name":
+                                    hostName = substr[1];
+                                    break;
+                                case "discon":
+                                    Disconnected();
+                                    break;
+                                default:
+                                    break;
+                            }
+                        }
+                        else
+                        {
+                            chatLock.WaitOne();
+                            chat.Add(message);
+                            chatLock.ReleaseMutex();
                         }
                     }
-                    else
-                    {
-                        mutex.WaitOne();
-                        chat.Add(message);
-                        mutex.ReleaseMutex();
-                    }
-                }
+                } 
+            }
+            catch (SocketException ex)
+            {
+                Disconnected();
             }
         }
 
@@ -210,6 +224,19 @@ namespace P2P_Chat
         protected override void SendMD(string message)
         {
             SendMsg(message);
+        }
+
+        /// <summary>
+        /// Informs user then closes application. Called when user is disconnected.
+        /// </summary>
+        void Disconnected()
+        {
+            SendMD("$discon<EOF>");
+            socket.Disconnect(false);
+            Console.Clear();
+            Console.WriteLine("You were disconnected from '" + hostName + "'.");
+            Console.ReadKey();
+            Environment.Exit(0);
         }
     }
 }
