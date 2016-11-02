@@ -220,8 +220,15 @@ namespace P2P_Chat
                     if (line.Length > 0 && line.ToCharArray()[0] == '/')
                     {
                         line = line.Remove(0, 1);
+                        line.ToUpper();
                         if (line.ToUpper().Contains("EXIT"))
+                        {
+                            clientLock.WaitOne();
+                            foreach (State s in sCLients)
+                                Disconnect(s);
+                            clientLock.ReleaseMutex();
                             break;
+                        }
                         else if (line.ToUpper().Contains("CLEAR"))
                         {
                             chatLock.WaitOne();
@@ -256,6 +263,14 @@ namespace P2P_Chat
             }
 
             poll.Abort();
+
+            while (true)
+            {
+                clientLock.WaitOne();
+                if (sCLients.Count == 0) return; //Environment.Exit(0);
+                clientLock.ReleaseMutex();
+                Thread.Sleep(250);
+            }
         }
 
         /// <summary>

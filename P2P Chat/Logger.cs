@@ -30,6 +30,12 @@ namespace P2P_Chat
             log.WriteLine("===========Chat Room Started===========");
         }
 
+        ~Logger()
+        {
+            log.Close();
+            ipLog.Close();
+        }
+
         /// <summary>
         /// 
         /// </summary>
