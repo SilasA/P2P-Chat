@@ -166,7 +166,9 @@ namespace P2P_Chat
                     }
                     else
                     {
+                        mutex.WaitOne();
                         chat.Add(message);
+                        mutex.ReleaseMutex();
                     }
                 }
             }

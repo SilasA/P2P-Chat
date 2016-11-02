@@ -147,7 +147,6 @@ namespace P2P_Chat
                 // more data.
                 if (message.IndexOf("<EOF>") > -1)
                 {
-                    message = message.Remove(message.IndexOf("<EOF>"));
                     // Find metadata
                     if (message.StartsWith("$"))
                     {
@@ -156,7 +155,7 @@ namespace P2P_Chat
                         switch (substr[0])
                         {
                             case "name":
-                                state.username = substr[1];
+                                state.username = substr[1].Remove(message.IndexOf("<EOF>"));
                                 break;
                             default:
                                 break;
@@ -172,12 +171,9 @@ namespace P2P_Chat
                         new AsyncCallback(ReadCallback), state);
                 }
             }
-            else
-            {
-                // Not all data received. Get more.
-                handler.BeginReceive(state.buffer, 0, MAX_CHAR, 0,
-                    new AsyncCallback(ReadCallback), state);
-            }
+            // Not all data received. Get more.
+            handler.BeginReceive(state.buffer, 0, MAX_CHAR, 0,
+                new AsyncCallback(ReadCallback), state);
         }
 
         /// <summary>
@@ -204,6 +200,7 @@ namespace P2P_Chat
             {
                 string line;
                 if (chat.Count > 15) chat.RemoveAt(0);
+                mutex.WaitOne();
                 if (isTyping)
                 {
                     line = Console.ReadLine();
@@ -215,7 +212,11 @@ namespace P2P_Chat
                         if (line.ToUpper() == "EXIT")
                             break;
                         else if (line.ToUpper() == "CLEAR")
+                        {
+                            chatLock.WaitOne();
                             chat.Clear();
+                            chatLock.ReleaseMutex();
+                        }
                     }
                     else
                     {
@@ -225,6 +226,7 @@ namespace P2P_Chat
                         mutex.ReleaseMutex();
                     }
                 }
+                mutex.ReleaseMutex();
                 Draw();
                 Thread.Sleep(500);
             }
@@ -251,7 +253,9 @@ namespace P2P_Chat
         {
             byte[] msg = Encoding.ASCII.GetBytes(message);
             message = message.Remove(message.IndexOf("<EOF>"));
+            chatLock.WaitOne();
             chat.Add(message);
+            chatLock.ReleaseMutex();
 
             clientLock.WaitOne();
             foreach (State s in sCLients)

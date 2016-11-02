@@ -27,6 +27,7 @@ namespace P2P_Chat
         protected bool showIPs = false;
 
         protected Mutex mutex;
+        protected Mutex chatLock;
         protected Thread poll;
 
         /// <summary>
@@ -69,6 +70,7 @@ namespace P2P_Chat
             chat = new List<string>();
             poll = new Thread(IsTypeMsg);
             mutex = new Mutex();
+            chatLock = new Mutex();
         }
 
         /// <summary>
@@ -81,9 +83,11 @@ namespace P2P_Chat
 
         protected virtual void Draw()
         {
+            chatLock.WaitOne();
             Console.WriteLine(new string('=', 30));
             foreach (string s in chat)
                 Console.WriteLine(s);
+            chatLock.ReleaseMutex();
         }
 
         /// <summary>
