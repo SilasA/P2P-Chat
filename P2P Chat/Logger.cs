@@ -32,8 +32,6 @@ namespace P2P_Chat
 
         ~Logger()
         {
-            log.Close();
-            ipLog.Close();
         }
 
         /// <summary>
@@ -43,6 +41,7 @@ namespace P2P_Chat
         public void WriteLine(string line)
         {
             log.WriteLine("[" + DateTime.Now.ToString("HH:mm:ss.tt") + "]: " + line);
+            log.Flush();
         }
 
         /// <summary>
@@ -55,6 +54,7 @@ namespace P2P_Chat
             ipLog.WriteLine(
                 "[" + DateTime.Now.ToString("MM-dd-yyyy") + "] " +
                 user + ": " + ip);
+            ipLog.Flush();
         }
     }
 }

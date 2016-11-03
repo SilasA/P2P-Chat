@@ -61,7 +61,6 @@ namespace P2P_Chat
         }
         ~Host()
         {
-            listenThread.Abort();
         }
 
         /// <summary>
@@ -153,7 +152,8 @@ namespace P2P_Chat
                     // Find metadata
                     if (message.StartsWith("$"))
                     {
-                        message = message.Substring(0, 1).Remove(message.IndexOf("<EOF>"));
+                        message = message.Substring(1);
+                        message = message.Remove(message.IndexOf("<EOF>"));
                         string[] substr = message.Split('=');
                         switch (substr[0])
                         {
@@ -237,7 +237,7 @@ namespace P2P_Chat
                         }
                         else if (line.ToUpper().Contains("DISCON"))
                         {
-                            string[] arg = line.Split('=');
+                            string[] arg = line.Split(' ');
                             if (arg.Length > 1)
                             {
                                 clientLock.WaitOne();
@@ -262,6 +262,7 @@ namespace P2P_Chat
                 Thread.Sleep(500);
             }
 
+            listenThread.Abort();
             poll.Abort();
 
             while (true)

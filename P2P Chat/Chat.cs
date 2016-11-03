@@ -58,7 +58,7 @@ namespace P2P_Chat
             foreach (IPAddress ip in host.AddressList)
             {
                 if (ip.AddressFamily == AddressFamily.InterNetwork)
-                    /*if (ip.ToString().StartsWith("10"))*/ return ip;
+                    if (ip.ToString().StartsWith("10")) return ip;
             }
             return new IPAddress(new byte[4]);
         }

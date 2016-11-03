@@ -19,8 +19,10 @@ namespace P2P_Chat
         Socket socket;
 
         string hostName;
+        bool exiting = false;
 
         public ManualResetEvent connected = new ManualResetEvent(false);
+        public ManualResetEvent msgSent = new ManualResetEvent(false);
 
         /// <summary>
         /// Prompts the user for the peer IP address.
@@ -74,14 +76,14 @@ namespace P2P_Chat
             socket.BeginConnect(epHost,
                 new AsyncCallback(ConnectCallback), socket);
             connected.WaitOne();
-            socket.Send(Encoding.ASCII.GetBytes("$name=" + name));
+            socket.Send(Encoding.ASCII.GetBytes("$name=" + name + "<EOF>"));
         }
 
         public override void Run()
         {
             poll.Start();
 
-            while (true)
+            while (!exiting)
             {
                 string line;
                 if (chat.Count > MAX_LINES) chat.RemoveAt(0);
@@ -194,12 +196,14 @@ namespace P2P_Chat
             Socket client = (Socket)ar.AsyncState;
 
             client.EndSend(ar);
+            msgSent.Set();
         }
 
         protected override void Draw()
         {
             Console.Clear();
             Console.WriteLine("Room Name: " + hostName);
+            Console.WriteLine("Username: " + name);
             base.Draw();
         }
 
@@ -212,6 +216,8 @@ namespace P2P_Chat
             // User has joined
             byte[] msg = new byte[MAX_CHAR];
             msg = Encoding.ASCII.GetBytes(message);
+
+            msgSent.Reset();
             // Begin sending the data to the remote device.
             socket.BeginSend(msg, 0, msg.Length, 0,
                 new AsyncCallback(SendCallback), socket);
@@ -232,6 +238,8 @@ namespace P2P_Chat
         void Disconnected()
         {
             SendMD("$discon<EOF>");
+            exiting = true;
+            msgSent.WaitOne();
             socket.Disconnect(false);
             Console.Clear();
             Console.WriteLine("You were disconnected from '" + hostName + "'.");
